@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,7 +31,7 @@ jobs:
 
   web:
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
       - name: Run web tests (headless, parallel)
         run: pytest tests/web -n auto --tracing retain-on-failure
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         if: ${{ !cancelled() }}
         with:
           distribution: temurin
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Allure report
         if: ${{ !cancelled() }}
-        run: npx --yes allure-commandline generate allure-results -o allure-report --clean
+        run: npx --yes allure-commandline generate allure-results -o allure-report --clean --single-file
 
       - name: Upload Allure report
         if: ${{ !cancelled() }}
@@ -82,7 +82,7 @@ jobs:
   publish-report:
     needs: web
     if: ${{ !cancelled() && needs.web.result != 'skipped' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
