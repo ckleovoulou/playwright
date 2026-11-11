@@ -1,0 +1,23 @@
+[project]
+name = "ai-test-automation-framework"
+version = "1.0.0"
+description = "Playwright + Pytest framework driven by AI planner/generator/healer agents, with Appium mobile smoke tests"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+base_url = "https://www.saucedemo.com"
+addopts = "-ra --alluredir=allure-results"
+markers = [
+    "web: browser tests (Playwright)",
+    "mobile: Android tests (Appium)",
+    "smoke: fast critical-path checks",
+    "regression: full functional coverage",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

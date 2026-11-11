@@ -1,0 +1,93 @@
+name: Mobile tests (Android)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # every Monday 06:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - "framework/mobile/**"
+      - "tests/mobile/**"
+      - ".github/workflows/mobile-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REQUIRE_MOBILE: "1" # fail instead of skip if Appium/APK are missing
+      APP_PATH: apps/ApiDemos-debug.apk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Appium + UiAutomator2 driver
+        run: |
+          npm install -g appium
+          appium driver install uiautomator2
+
+      - name: Download ApiDemos APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download -R appium/android-apidemos -p "*.apk" -D apps
+          apk=$(ls apps/*.apk | head -n 1)
+          [ "$apk" = "$APP_PATH" ] || mv "$apk" "$APP_PATH"
+          ls -l apps
+
+      - name: Start Appium server
+        run: nohup appium --log appium.log > /dev/null 2>&1 &
+
+      - name: Run Appium tests on a headless Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: pytest tests/mobile -v
+
+      - name: Build Allure report
+        if: ${{ !cancelled() }}
+        run: npx --yes allure-commandline generate allure-results -o allure-report --clean
+
+      - name: Upload Allure report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-mobile
+          path: allure-report
+
+      - name: Upload Appium log
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-log
+          path: appium.log
